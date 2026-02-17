@@ -4,15 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-mind_snag is a self-contained MATLAB package for Neuropixel spike sorting, curation, and cross-recording neuron stitching. It wraps Kilosort4 and provides a 7-stage pipeline from raw SpikeGLX data to trial-aligned rasters and isolation-scored units.
+mind_snag is a Neuropixel spike sorting, curation, and cross-recording neuron stitching package. It wraps Kilosort4 and provides a 7-stage pipeline from raw SpikeGLX data to trial-aligned rasters and isolation-scored units. The repo contains two implementations:
 
-## Package Structure
+- **MATLAB v1.0** (root directory) — 28 functions, ~3700 lines
+- **Python v2.0** (`mind_snag_py/`) — 28 modules, ~2700 lines, pip-installable
+
+## Repository Structure
 
 ```
 mind_snag/
-├── pipeline_KS4.m          # Main entry point - orchestrates all 7 stages
+├── pipeline_KS4.m          # MATLAB entry point - orchestrates all 7 stages
 ├── Auto_Stitching_V2.m     # Stitching wrapper (stitch + save)
-├── setup.m                 # Run once per session to add dirs to path
+├── setup.m                 # Run once per MATLAB session to add dirs to path
 ├── sorting/                # run_kilosort4, extract_spikes
 ├── curation/               # compute_isolation, extract_isolated_units
 ├── analysis/               # extract_rasters
@@ -20,20 +23,26 @@ mind_snag/
 ├── visualization/          # fr_heatmap
 ├── utils/                  # loadKSdir, readNPY, psth, trialNPSpike, etc.
 ├── config/                 # mind_snag_config, mind_snag_save_config
-└── examples/               # 3 example scripts
+├── examples/               # 3 example scripts
+└── mind_snag_py/           # Python v2.0 package
+    ├── pyproject.toml
+    ├── config/example_config.yaml
+    ├── docs/               # migration_guide.md, data_format.md
+    ├── src/mind_snag/      # 28 modules (config, io, sorting, curation, etc.)
+    └── tests/              # 41 unit tests
 ```
 
 ## Architecture
 
-All functions take a `cfg` struct (from `mind_snag_config`) as their first argument. This replaces the old global variables (`MONKEYDIR`, `MONKEYNAME`). Key fields: `cfg.data_root`, `cfg.kilosort_venv`, `cfg.stitching.*`, `cfg.curation.*`.
+Both versions share the same architecture. All functions take a `cfg` object (MATLAB struct / Python dataclass) as their first argument. This replaces the old global variables (`MONKEYDIR`, `MONKEYNAME`). Key fields: `cfg.data_root`, `cfg.stitching.*`, `cfg.curation.*`.
 
 Pipeline stages are sequential (each depends on previous outputs):
 1. `run_kilosort4` → KS4 output in `grouped_recordings.{tower}.{np}/`
-2. `extract_spikes` → `NPclu.mat` (drift-corrected spike times)
-3. `compute_isolation` → `SortData.mat` (PC features, isolation scores)
-4. `extract_rasters` → `RasterData.mat` (trial-aligned spikes)
+2. `extract_spikes` → `NPclu.mat` / `.h5` (drift-corrected spike times)
+3. `compute_isolation` → `SortData.mat` / `.h5` (PC features, isolation scores)
+4. `extract_rasters` → `RasterData.mat` / `.h5` (trial-aligned spikes)
 5. Auto-curation → (pending: still requires GUI)
-6. `extract_isolated_units` → updates `NPclu.mat` with `IsoClu_info`
+6. `extract_isolated_units` → updates NPclu with `IsoClu_info`
 7. `fr_heatmap` → visualization
 
 ## Data Path Convention
@@ -67,10 +76,39 @@ Applied in `extract_spikes`: AP timebase → NIDQ timebase → recording timebas
 3. Stitching if both FR corr ≥ threshold AND waveform corr ≥ threshold
 4. Deduplicating and filtering by minimum recording count
 
-## Running
+## Running (MATLAB)
 
 ```matlab
 cd /path/to/mind_snag; setup;
 cfg = mind_snag_config('data_root', '/data', 'kilosort_venv', '/venv');
 pipeline_KS4(cfg, '250224', {'007','009','010'}, 'LPPC_LPFC_modularV1', 1);
 ```
+
+## Running (Python)
+
+```bash
+pip install -e mind_snag_py/
+```
+
+```python
+from mind_snag import Pipeline, MindSnagConfig
+
+cfg = MindSnagConfig(data_root="/data")
+pipeline = Pipeline(cfg)
+pipeline.run(day="250224", recs=["007", "009", "010"],
+             tower="LPPC_LPFC_modularV1", np_num=1)
+```
+
+```bash
+mind-snag run --config config.yaml --day 250224 --recs 007 009 010 \
+    --tower LPPC_LPFC_modularV1 --np 1
+```
+
+## Python Package Details
+
+- **Config**: Nested dataclasses (`MindSnagConfig`) with YAML serialization. GPU is 0-indexed (MATLAB was 1-indexed).
+- **I/O**: Reads legacy `.mat` (v7 and v7.3/HDF5). Writes new outputs as `.h5` with gzip compression.
+- **Kilosort**: Calls the `kilosort` Python API directly — no virtualenv/subprocess needed.
+- **Indexing**: 0-indexed internally, 1-indexed in stored files for backward compatibility.
+- **Tests**: `pytest mind_snag_py/tests/` — 41 tests covering config, I/O, sorting, stitching, paths, PSTH.
+- **Docs**: `mind_snag_py/docs/migration_guide.md` (MATLAB→Python mapping), `data_format.md` (HDF5 schemas).
