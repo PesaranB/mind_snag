@@ -1,0 +1,23 @@
+data_root: /path/to/experimental/data
+output_root: null  # defaults to data_root
+gpu: 0
+n_threads: 64
+ks_version: 4
+
+curation:
+  l_ratio_threshold: 0.2
+  isi_violation_rate: 0.2
+  isolated_t_ratio: 0.6
+
+stitching:
+  fr_corr_threshold: 0.85
+  wf_corr_threshold: 0.85
+  min_recordings: 2
+  channel_range: 10
+
+raster:
+  time_window: [-300, 500]
+  smoothing: 10
+
+isolation:
+  window_sec: 100
