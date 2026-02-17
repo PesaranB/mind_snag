@@ -1,5 +1,9 @@
 # mind_snag
 
+[![GitHub release](https://img.shields.io/github/v/release/PesaranB/mind_snag)](https://github.com/PesaranB/mind_snag/releases/latest)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Neuropixel spike sorting, curation, and cross-recording neuron stitching. Python port of the [MATLAB mind_snag package](https://github.com/PesaranB/mind_snag).
 
 ## Installation
