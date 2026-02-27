@@ -138,7 +138,7 @@ cfg = mind_snag_config('my_config.mat');
 | 2 | Extract | `extract_spikes` | Load KS4 output, apply drift correction |
 | 3 | Isolation | `compute_isolation` | PC features, signal-to-noise per cluster |
 | 4 | Rasters | `extract_rasters` | Trial-aligned spikes per task type |
-| 5 | Curation | *(pending)* | Threshold-based unit classification |
+| 5 | Curation | `ks4_curation_gui.py` | Interactive Python GUI for cluster review (see below) |
 | 6 | Iso Units | `extract_isolated_units` | Identify well-isolated units |
 | 7 | Heatmap | `fr_heatmap` | Depth-sorted firing rate visualization |
 
@@ -183,6 +183,55 @@ mind_snag/
 ├── README.md
 └── LICENSE
 ```
+
+## Curation GUI (Python — SNaG port)
+
+`ks4_curation_gui.py` is a keyboard-driven Python GUI for curating Kilosort4 output. It is a port of the lab's MATLAB SNaG interface (`KiloSort4_SpikeSorting.m`), adapted for KS4 phy-format output with generic event-time alignment.
+
+**Requires**: numpy, matplotlib, scipy, and the `mind_snag` Python package (for `load_ks_dir`).
+
+```bash
+# Browse all clusters
+python ks4_curation_gui.py /path/to/kilosort4_output/
+
+# With event-aligned raster + PSTH
+python ks4_curation_gui.py /path/to/kilosort4_output/ --events swr_times.npy
+
+# Random test events for validation
+python ks4_curation_gui.py /path/to/kilosort4_output/ --test-events 150
+
+# Custom options
+python ks4_curation_gui.py /path/to/kilosort4_output/ --events swr_times.npy \
+    --event-window -0.2 0.5 --frame-duration 600 --cluster 42 --sort amplitude
+```
+
+### Layout
+
+| Panel | Content |
+|-------|---------|
+| Top-left (3 panels) | PC feature scatter (PC1v2, PC1v3, PC2v3) with noise cloud, main cluster, and up to 8 other-channel clusters overlaid |
+| Top-right | Cluster quality map — click to navigate |
+| Bottom-left | Template waveform overlay (main + other clusters, color-coded) |
+| Bottom-right | Event-aligned raster + smoothed PSTH (or autocorrelogram + firing rate when no events) |
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| Left / Right | Previous / Next cluster |
+| F / B | Next / Previous time frame |
+| g / m / n | Label as good / MUA / noise |
+| Space | Confirm label + advance |
+| 1-8 | Toggle other-cluster overlay |
+| G / M | Jump to next good / MUA cluster |
+| T | Cycle sort order (cluster_id, quality, amplitude, firing_rate, depth) |
+| S | Save (`cluster_group.tsv` + `curation_state.json`) |
+| Q | Save + quit |
+
+### Output
+
+- **`cluster_group.tsv`** — phy-compatible labels (backs up original on first write)
+- **`curation_state.json`** — full session state; relaunching the GUI auto-restores position, labels, and settings
 
 ## Grouped vs Non-Grouped Mode
 

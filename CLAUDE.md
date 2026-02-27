@@ -41,7 +41,7 @@ Pipeline stages are sequential (each depends on previous outputs):
 2. `extract_spikes` → `NPclu.mat` / `.h5` (drift-corrected spike times)
 3. `compute_isolation` → `SortData.mat` / `.h5` (PC features, isolation scores)
 4. `extract_rasters` → `RasterData.mat` / `.h5` (trial-aligned spikes)
-5. Auto-curation → (pending: still requires GUI)
+5. Auto-curation → `ks4_curation_gui.py` (Python SNaG port — interactive cluster review)
 6. `extract_isolated_units` → updates NPclu with `IsoClu_info`
 7. `fr_heatmap` → visualization
 

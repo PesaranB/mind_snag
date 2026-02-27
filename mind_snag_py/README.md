@@ -46,9 +46,26 @@ pipeline.run(day="250224", recs=["007", "009", "010"],
 2. **extract_spikes** - Two-stage drift correction, NPclu output
 3. **compute_isolation** - PC-based SNR isolation scoring
 4. **extract_rasters** - Trial-aligned rasters for 8 task types
-5. **auto_curation** - (pending: requires manual GUI step)
+5. **ks4_curation_gui** - Interactive Python GUI for cluster review (SNaG port)
 6. **extract_isolated_units** - Filter units by isolation score
 7. **fr_heatmap** - Firing rate heatmap visualization
+
+## Curation GUI
+
+After running KS4, curate clusters interactively with the SNaG-style GUI:
+
+```bash
+# Basic usage (autocorrelogram + firing rate view)
+python ks4_curation_gui.py /path/to/kilosort4_output/
+
+# With event-aligned raster + PSTH
+python ks4_curation_gui.py /path/to/kilosort4_output/ --events swr_times.npy
+
+# See all options
+python ks4_curation_gui.py --help
+```
+
+The GUI uses `mind_snag.io.load_ks_dir()` to read KS4 output and memory-maps `pc_features.npy` for on-demand PC scatter plots. Saves phy-compatible `cluster_group.tsv` and a `curation_state.json` for session resume. See the root [README](../README.md#curation-gui-python--snag-port) for full keyboard shortcuts and layout details.
 
 ## Data Format
 
