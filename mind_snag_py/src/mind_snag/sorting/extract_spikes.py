@@ -18,7 +18,7 @@ from mind_snag.io.mat_reader import load_mat
 from mind_snag.io.hdf5_writer import write_npclu_h5
 from mind_snag.utils.channel_info import clus_channel_info
 from mind_snag.utils.paths import (
-    ks_output_dir, rec_name_str, group_flag_str, group_rec_dir,
+    ks_output_dir, npclu_filename, rec_name_str, group_flag_str, group_rec_dir,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,8 @@ def extract_spikes(
 
     rec_str = rec_name_str(recs, grouped)
     gflag = group_flag_str(grouped)
-    ks_dir = ks_output_dir(data_root, day, tower, np_num, rec_str, cfg.ks_version)
+    ks_dir = ks_output_dir(data_root, day, tower, np_num, rec_str, cfg.ks_version,
+                           path_cfg=cfg.paths)
 
     if not ks_dir.exists():
         raise FileNotFoundError(
@@ -60,7 +61,7 @@ def extract_spikes(
     max_site, _ = clus_channel_info(cfg, day, recs, tower, np_num, grouped)
 
     # Load group file
-    grp_dir = group_rec_dir(data_root, day, tower, np_num)
+    grp_dir = group_rec_dir(data_root, day, tower, np_num, path_cfg=cfg.paths)
     group_file = grp_dir / f"spike_sorting_rec_groups_{rec_str}.mat"
 
     if grouped:
@@ -146,7 +147,11 @@ def _extract_grouped(
         ks_clu_info = clu_info[ks_mask]
 
         # Save
-        out_file = output_dir / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu.h5"
+        out_file = npclu_filename(
+            data_root, day, rec, tower, np_num, gflag,
+            ext=".h5", path_cfg=cfg.paths,
+        )
+        out_file.parent.mkdir(parents=True, exist_ok=True)
         logger.info("Saving: %s", out_file)
         write_npclu_h5(
             out_file,
@@ -208,10 +213,11 @@ def _extract_single(
     ks_mask = np.isin(clu_info[:, 0], ks_clu_id)
     ks_clu_info = clu_info[ks_mask]
 
-    output_dir = data_root / day / rec
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    out_file = output_dir / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu.h5"
+    out_file = npclu_filename(
+        data_root, day, rec, tower, np_num, gflag,
+        ext=".h5", path_cfg=cfg.paths,
+    )
+    out_file.parent.mkdir(parents=True, exist_ok=True)
     logger.info("Saving: %s", out_file)
     write_npclu_h5(
         out_file,

@@ -1,4 +1,4 @@
-function stitch_table = stitch_neurons(cfg, day, recs, tower, np, grouped, cluster_type)
+function [stitch_table, stitch_scores] = stitch_neurons(cfg, day, recs, tower, np, grouped, cluster_type)
 % STITCH_NEURONS Cross-recording neuron identity matching
 %
 %   stitch_table = stitch_neurons(cfg, day, recs, tower, np, grouped, cluster_type)
@@ -194,6 +194,8 @@ fprintf('Found %d unique channels across recordings.\n', length(uniChans));
 %% Run stitching prediction
 fprintf('Running stitching prediction...\n');
 Stitch_Prediction_List = [];
+FR_Score_List = [];
+WF_Score_List = [];
 
 for iUni_Chan = 1:length(uniChans)
     currentChan = uniChans(iUni_Chan);
@@ -255,6 +257,10 @@ for iUni_Chan = 1:length(uniChans)
 
             Stitched_List_PerUnit = nan(1, numRecs);
             Stitched_List_PerUnit(irec) = thiscluster_ID;
+            FR_Scores_PerUnit = nan(1, numRecs);
+            WF_Scores_PerUnit = nan(1, numRecs);
+            FR_Scores_PerUnit(irec) = 1.0;
+            WF_Scores_PerUnit(irec) = 1.0;
 
             OtherRec_Indexes = find(~ismember(1:numRecs, irec));
 
@@ -285,10 +291,14 @@ for iUni_Chan = 1:length(uniChans)
                 if sortedFR_corr(1) >= fr_threshold && Wf_correlate(maxFRIdx) >= wf_threshold
                     otherRec_cluster_ID = otherRec_Clus_IDs(maxFRIdx);
                     Stitched_List_PerUnit(thisotherRec_ind) = otherRec_cluster_ID;
+                    FR_Scores_PerUnit(thisotherRec_ind) = sortedFR_corr(1);
+                    WF_Scores_PerUnit(thisotherRec_ind) = Wf_correlate(maxFRIdx);
                 end
             end
 
             Stitch_Prediction_List = [Stitch_Prediction_List; Stitched_List_PerUnit];
+            FR_Score_List = [FR_Score_List; FR_Scores_PerUnit];
+            WF_Score_List = [WF_Score_List; WF_Scores_PerUnit];
         end
     end
 end
@@ -296,6 +306,7 @@ end
 %% Deduplicate and filter
 if isempty(Stitch_Prediction_List)
     stitch_table = [];
+    stitch_scores = struct('fr_corr', [], 'wf_corr', [], 'confidence', []);
     fprintf('No stitched neurons found.\n');
     return;
 end
@@ -305,10 +316,17 @@ List_equalNaN = Stitch_Prediction_List;
 List_equalNaN(nanMask) = 0;
 [~, ia] = unique(List_equalNaN, 'rows');
 UniqueStitch_List = Stitch_Prediction_List(ia, :);
+Unique_FR_Scores = FR_Score_List(ia, :);
+Unique_WF_Scores = WF_Score_List(ia, :);
 
 % Filter by minimum recording count
 rowsWithMultiple = find(sum(~isnan(UniqueStitch_List), 2) >= min_recs);
 stitch_table = UniqueStitch_List(rowsWithMultiple, :);
+
+% Build enriched scores output
+stitch_scores.fr_corr    = Unique_FR_Scores(rowsWithMultiple, :);
+stitch_scores.wf_corr    = Unique_WF_Scores(rowsWithMultiple, :);
+stitch_scores.confidence = sqrt(max(stitch_scores.fr_corr, 0) .* max(stitch_scores.wf_corr, 0));
 
 fprintf('Stitching complete: %d neurons found across %d recordings.\n', ...
     size(stitch_table, 1), numRecs);

@@ -1,4 +1,4 @@
-function save_stitch_results(cfg, stitch_table, day, recs, tower, np, output_dir)
+function save_stitch_results(cfg, stitch_table, day, recs, tower, np, output_dir, stitch_scores)
 % SAVE_STITCH_RESULTS Save neuron stitching results to a MATLAB script file
 %
 %   save_stitch_results(cfg, stitch_table, day, recs, tower, np, output_dir)
@@ -88,5 +88,12 @@ end
 
 fclose(fileID);
 fprintf('Stitch results saved to: %s\n', fileName);
+
+% Save enriched scores as .mat alongside the .m file
+if nargin >= 8 && ~isempty(stitch_scores)
+    scores_file = fullfile(output_dir, sprintf('stitch_scores_%s_%s.mat', day, grouped_rec_name));
+    save(scores_file, 'stitch_table', 'stitch_scores', 'day', 'recs', 'tower', 'np');
+    fprintf('Stitch scores saved to: %s\n', scores_file);
+end
 
 end

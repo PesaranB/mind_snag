@@ -68,6 +68,16 @@ cfg.raster.smoothing             = 10;           % ms gaussian std for PSTH
 % --- Isolation analysis ---
 cfg.isolation.window_sec         = 100;  % seconds per time window
 
+% --- Path templates ---
+% Full paths relative to data_root. Use {key} placeholders.
+% Labs with non-SpikeGLX layouts override these templates.
+cfg.paths.raw_data    = '{day}/spikeglx_data/{rec}/{rec}_imec{np}';
+cfg.paths.group_rec   = '{day}/spikeglx_data/grouped_recordings.{tower}.{np}';
+cfg.paths.ks_output   = '{day}/spikeglx_data/grouped_recordings.{tower}.{np}/group{rec_name}_KS4';
+cfg.paths.npclu       = '{day}/{rec}/rec{rec}.{tower}.{np}.{group_flag}.NPclu.mat';
+cfg.paths.sort_data   = '{day}/{rec}/{ks_save_prefix}rec{rec}.{tower}.{np}.{clu}.{group_flag}.SortData.mat';
+cfg.paths.raster_data = '{day}/{rec}/{ks_save_prefix}rec{rec}.{tower}.{np}.{clu}.{group_flag}.RasterData.mat';
+
 % Apply user overrides
 for i = 1:2:length(varargin)
     key = varargin{i};

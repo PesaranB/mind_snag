@@ -22,6 +22,22 @@ class CurationConfig:
 
 
 @dataclass
+class PathConfig:
+    """Full path templates from data_root. Use {variable} placeholders.
+
+    Variables are provided at runtime by the pipeline. Labs define their
+    own templates and variables. Defaults match the Pesaran lab layout.
+    """
+
+    raw_data: str = "{day}/spikeglx_data/{rec}/{rec}_imec{np_num}"
+    group_rec: str = "{day}/spikeglx_data/grouped_recordings.{tower}.{np_num}"
+    ks_output: str = "{day}/spikeglx_data/grouped_recordings.{tower}.{np_num}/group{rec_name}_KS4"
+    npclu: str = "{day}/{rec}/rec{rec}.{tower}.{np_num}.{group_flag}.NPclu"
+    sort_data: str = "{day}/{rec}/{ks_save_prefix}rec{rec}.{tower}.{np_num}.{clu}.{group_flag}.SortData"
+    raster_data: str = "{day}/{rec}/{ks_save_prefix}rec{rec}.{tower}.{np_num}.{clu}.{group_flag}.RasterData"
+
+
+@dataclass
 class StitchingConfig:
     """Parameters for cross-recording neuron stitching."""
 
@@ -29,6 +45,8 @@ class StitchingConfig:
     wf_corr_threshold: float = 0.85
     min_recordings: int = 2
     channel_range: int = 10
+    backend: str = "native"
+    top_k: int = 3
 
 
 @dataclass
@@ -60,6 +78,7 @@ class MindSnagConfig:
     n_threads: int = 64
     ks_version: int = 4
 
+    paths: PathConfig = field(default_factory=PathConfig)
     curation: CurationConfig = field(default_factory=CurationConfig)
     stitching: StitchingConfig = field(default_factory=StitchingConfig)
     raster: RasterConfig = field(default_factory=RasterConfig)
@@ -72,6 +91,8 @@ class MindSnagConfig:
         else:
             self.output_root = Path(self.output_root)
         # Convert nested dicts from YAML loading to dataclass instances
+        if isinstance(self.paths, dict):
+            self.paths = PathConfig(**self.paths)
         if isinstance(self.curation, dict):
             self.curation = CurationConfig(**self.curation)
         if isinstance(self.stitching, dict):

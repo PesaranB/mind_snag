@@ -21,7 +21,8 @@ from mind_snag.trials.trial_spike import trial_np_spike
 from mind_snag.trials.task_types import TASK_TYPES, TaskTypeConfig
 from mind_snag.utils.channel_info import clus_channel_info
 from mind_snag.utils.paths import (
-    ks_output_dir, rec_name_str, group_flag_str, raster_data_filename,
+    ks_output_dir, npclu_filename, rec_name_str, group_flag_str,
+    raster_data_filename,
 )
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,8 @@ def extract_rasters(
 
     rec_str = rec_name_str(recs, grouped)
     gflag = group_flag_str(grouped)
-    ks_dir = ks_output_dir(data_root, day, tower, np_num, rec_str, cfg.ks_version)
+    ks_dir = ks_output_dir(data_root, day, tower, np_num, rec_str, cfg.ks_version,
+                           path_cfg=cfg.paths)
 
     max_site, _ = clus_channel_info(cfg, day, recs, tower, np_num, grouped)
 
@@ -66,8 +68,14 @@ def extract_rasters(
         ks_file = ks_dir / "cluster_KSLabel.tsv"
 
         if grouped:
-            npclu_h5 = data_root / day / rec / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu.h5"
-            npclu_mat = data_root / day / rec / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu.mat"
+            npclu_h5 = npclu_filename(
+                data_root, day, rec, tower, np_num, gflag,
+                ext=".h5", path_cfg=cfg.paths,
+            )
+            npclu_mat = npclu_filename(
+                data_root, day, rec, tower, np_num, gflag,
+                ext=".mat", path_cfg=cfg.paths,
+            )
             if npclu_h5.exists():
                 import h5py
                 with h5py.File(npclu_h5, "r") as f:
@@ -132,6 +140,7 @@ def extract_rasters(
                 grouped_rec_name=grouped_rec_name,
                 ks_version=cfg.ks_version,
                 ext=".h5",
+                path_cfg=cfg.paths,
             )
             out_file.parent.mkdir(parents=True, exist_ok=True)
             write_raster_data_h5(
@@ -235,6 +244,6 @@ def _save_empty_raster(
         grouped_rec_name=grouped_rec_name,
         ks_version=ks_version,
         ext=".h5",
-    )
+    )  # no path_cfg here — uses legacy defaults
     out_file.parent.mkdir(parents=True, exist_ok=True)
     write_raster_data_h5(out_file, clu=clu, spike_clu=[], rt=None)

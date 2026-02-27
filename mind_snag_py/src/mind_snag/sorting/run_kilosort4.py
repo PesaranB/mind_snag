@@ -13,7 +13,7 @@ import numpy as np
 
 from mind_snag.config import MindSnagConfig
 from mind_snag.io.mat_reader import load_mat
-from mind_snag.utils.paths import group_rec_dir, rec_name_str
+from mind_snag.utils.paths import group_rec_dir, ks_output_dir, rec_name_str
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def run_kilosort4(
     rec_str = rec_name_str(recs, grouped)
 
     # Create grouped recordings directory
-    grp_dir = group_rec_dir(data_root, day, tower, np_num)
+    grp_dir = group_rec_dir(data_root, day, tower, np_num, path_cfg=cfg.paths)
     grp_dir.mkdir(parents=True, exist_ok=True)
 
     # Concatenate input data if grouped
@@ -61,7 +61,8 @@ def run_kilosort4(
         input_data = _find_single_rec_bin(cfg, day, recs[0], tower, np_num)
 
     # Create KS4 output directory
-    ks_result_dir = grp_dir / f"group{rec_str}_KS4"
+    ks_result_dir = ks_output_dir(data_root, day, tower, np_num, rec_str,
+                                  cfg.ks_version, path_cfg=cfg.paths)
     ks_result_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Input: %s", input_data)

@@ -21,7 +21,8 @@ from mind_snag.utils.channel_info import get_np_chan_depth_info
 from mind_snag.utils.psth import psth
 from mind_snag.utils.sorting_utils import sort_spikes_by_rt
 from mind_snag.utils.paths import (
-    ks_output_dir, rec_name_str, group_flag_str, raster_data_filename,
+    ks_output_dir, npclu_filename, rec_name_str, group_flag_str,
+    raster_data_filename,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,8 @@ def fr_heatmap(
         ax = axes[0, i_r]
         rec_str = rec_name_str(recs, grouped) if grouped else rec
         gflag = group_flag_str(grouped)
-        ks_dir = ks_output_dir(data_root, day, tower, np_num, rec_str, cfg.ks_version)
+        ks_dir = ks_output_dir(data_root, day, tower, np_num, rec_str, cfg.ks_version,
+                               path_cfg=cfg.paths)
 
         ks_file = ks_dir / "cluster_KSLabel.tsv"
         if not ks_file.exists():
@@ -81,8 +83,14 @@ def fr_heatmap(
         my_clus = cids + 1
 
         # Load NPclu for channel info
-        npclu_h5 = data_root / day / rec / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu.h5"
-        npclu_mat = data_root / day / rec / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu.mat"
+        npclu_h5 = npclu_filename(
+            data_root, day, rec, tower, np_num, gflag,
+            ext=".h5", path_cfg=cfg.paths,
+        )
+        npclu_mat = npclu_filename(
+            data_root, day, rec, tower, np_num, gflag,
+            ext=".mat", path_cfg=cfg.paths,
+        )
 
         if npclu_h5.exists():
             with h5py.File(npclu_h5, "r") as f:
@@ -111,6 +119,7 @@ def fr_heatmap(
                 grouped_rec_name=grouped_rec_name,
                 ks_version=cfg.ks_version,
                 ext=".h5",
+                path_cfg=cfg.paths,
             )
             raster_file_mat = raster_file.with_suffix(".mat")
 

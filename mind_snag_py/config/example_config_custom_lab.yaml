@@ -1,0 +1,26 @@
+# Example configuration for a non-SpikeGLX lab.
+#
+# This shows how to override path templates for a flat session-based layout.
+# Any {variable} placeholders can be used — they are substituted at runtime
+# from the variables dict passed to Pipeline.run() or resolve_path().
+#
+# In this layout, data is organized as:
+#   /data/lab_recordings/{subject}/{session}/raw_probe{probe}/
+#   /data/lab_recordings/{subject}/{session}/sorted_probe{probe}/
+#   etc.
+
+data_root: /data/lab_recordings
+
+paths:
+  raw_data: "{subject}/{session}/raw_probe{probe}"
+  ks_output: "{subject}/{session}/sorted_probe{probe}"
+  npclu: "{subject}/{session}/npclu_probe{probe}"
+  sort_data: "{subject}/{session}/clusters/clu{clu}_sort"
+  raster_data: "{subject}/{session}/clusters/clu{clu}_raster"
+
+stitching:
+  backend: "native"
+  fr_corr_threshold: 0.80
+  wf_corr_threshold: 0.80
+  min_recordings: 2
+  channel_range: 10

@@ -129,13 +129,13 @@ if ismember('iso_units', stages)
     fprintf('--- Isolated unit extraction complete ---\n\n');
 end
 
-%% Stage 7: Visualization
-if ismember('heatmap', stages)
-    fprintf('--- Stage 7: Generating heatmaps ---\n');
-    fr_heatmap(cfg, day, tower, np, grouped, recs);
-    fprintf('--- Heatmaps complete ---\n\n');
-end
-
-fprintf('=== Pipeline complete ===\n');
+% %% Stage 7: Visualization
+% if ismember('heatmap', stages)
+%     fprintf('--- Stage 7: Generating heatmaps ---\n');
+%     fr_heatmap(cfg, day, tower, np, grouped, recs);
+%     fprintf('--- Heatmaps complete ---\n\n');
+% end
+% 
+% fprintf('=== Pipeline complete ===\n');
 
 end

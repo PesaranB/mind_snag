@@ -4,12 +4,26 @@ gpu: 0
 n_threads: 64
 ks_version: 4
 
+# Path templates — full paths relative to data_root.
+# Use {variable} placeholders. Variables are passed at runtime.
+# Defaults below match the Pesaran lab SpikeGLX layout.
+# Override these for a different data organization.
+paths:
+  raw_data: "{day}/spikeglx_data/{rec}/{rec}_imec{np_num}"
+  group_rec: "{day}/spikeglx_data/grouped_recordings.{tower}.{np_num}"
+  ks_output: "{day}/spikeglx_data/grouped_recordings.{tower}.{np_num}/group{rec_name}_KS4"
+  npclu: "{day}/{rec}/rec{rec}.{tower}.{np_num}.{group_flag}.NPclu"
+  sort_data: "{day}/{rec}/{ks_save_prefix}rec{rec}.{tower}.{np_num}.{clu}.{group_flag}.SortData"
+  raster_data: "{day}/{rec}/{ks_save_prefix}rec{rec}.{tower}.{np_num}.{clu}.{group_flag}.RasterData"
+
 curation:
   l_ratio_threshold: 0.2
   isi_violation_rate: 0.2
   isolated_t_ratio: 0.6
 
 stitching:
+  backend: "native"         # "native" (FR + WF dual-evidence) or "unitmatch"
+  top_k: 3                  # number of top candidates to store per match
   fr_corr_threshold: 0.85
   wf_corr_threshold: 0.85
   min_recordings: 2

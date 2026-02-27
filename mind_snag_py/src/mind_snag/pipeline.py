@@ -23,6 +23,7 @@ class Stage(str, Enum):
     RASTERS = "rasters"
     CURATION = "curation"
     ISO_UNITS = "iso_units"
+    STITCHING = "stitching"
     HEATMAP = "heatmap"
 
 
@@ -140,7 +141,21 @@ class Pipeline:
                     extract_isolated_units(self.cfg, day, [rec], tower, np_num, False)
             logger.info("--- Isolated unit extraction complete ---")
 
-        # Stage 7: Visualization
+        # Stage 7: Stitching
+        if Stage.STITCHING in active_stages:
+            logger.info("--- Stage 7: Stitching neurons ---")
+            logger.info("Backend: %s", self.cfg.stitching.backend)
+            from mind_snag.stitching.backends import get_backend
+            from mind_snag.stitching.save_stitch_results import save_stitch_results as _save_stitch
+            backend = get_backend(self.cfg.stitching.backend)
+            result = backend.run(
+                self.cfg, day, recs, tower, np_num, grouped, "All",
+            )
+            output_dir = self.cfg.data_root / day
+            _save_stitch(self.cfg, result, output_dir)
+            logger.info("--- Stitching complete ---")
+
+        # Stage 8: Visualization
         if Stage.HEATMAP in active_stages:
             logger.info("--- Stage 7: Generating heatmaps ---")
             from mind_snag.visualization.fr_heatmap import fr_heatmap
@@ -148,3 +163,29 @@ class Pipeline:
             logger.info("--- Heatmaps complete ---")
 
         logger.info("=== Pipeline complete ===")
+
+    def run_sessions(
+        self,
+        sessions: list[dict],
+        grouped: bool = False,
+        stages: list[str | Stage] | None = None,
+    ) -> None:
+        """Generic entry point for arbitrary data layouts.
+
+        Each session is a dict of template variables that will be substituted
+        into the path templates defined in ``cfg.paths``.
+
+        Parameters
+        ----------
+        sessions : list of variable dicts (one per recording)
+        grouped : whether recordings are concatenated
+        stages : optional list of stage names to run
+        """
+        if not sessions:
+            raise ValueError("sessions list must not be empty")
+        first = sessions[0]
+        day = first.get("day", "")
+        recs = [s.get("rec", "") for s in sessions]
+        tower = first.get("tower", "")
+        np_num = int(first.get("np_num", 1))
+        self.run(day=day, recs=recs, tower=tower, np_num=np_num, stages=stages)

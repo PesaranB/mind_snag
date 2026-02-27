@@ -136,6 +136,74 @@ from mind_snag.trials.task_types import TASK_TYPES
 | `getNP_chanDepthInfo.m` | `mind_snag.utils.channel_info` |
 | 6 small utils | `mind_snag.utils.experiment` |
 
+## Configurable Path Templates (v2.1+)
+
+Path patterns are now fully configurable via `cfg.paths`. This allows non-SpikeGLX labs to use mind_snag without modifying source code.
+
+### Default (Pesaran lab SpikeGLX layout)
+
+```yaml
+paths:
+  raw_data: "{day}/spikeglx_data/{rec}/{rec}_imec{np_num}"
+  ks_output: "{day}/spikeglx_data/grouped_recordings.{tower}.{np_num}/group{rec_name}_KS4"
+  npclu: "{day}/{rec}/rec{rec}.{tower}.{np_num}.{group_flag}.NPclu"
+  sort_data: "{day}/{rec}/{ks_save_prefix}rec{rec}.{tower}.{np_num}.{clu}.{group_flag}.SortData"
+  raster_data: "{day}/{rec}/{ks_save_prefix}rec{rec}.{tower}.{np_num}.{clu}.{group_flag}.RasterData"
+```
+
+### Custom lab layout
+
+```yaml
+paths:
+  raw_data: "{subject}/{session}/raw_probe{probe}"
+  ks_output: "{subject}/{session}/sorted_probe{probe}"
+  npclu: "{subject}/{session}/npclu_probe{probe}"
+  sort_data: "{subject}/{session}/clusters/clu{clu}_sort"
+  raster_data: "{subject}/{session}/clusters/clu{clu}_raster"
+```
+
+Custom labs pass their own variable dicts via `resolve_path()` or `Pipeline.run_sessions()`.
+
+```python
+from mind_snag.utils.paths import resolve_path
+path = resolve_path(cfg.data_root, cfg.paths.npclu,
+                    {"subject": "monkey_A", "session": "20250224_01", "probe": "0"},
+                    ext=".h5")
+```
+
+The MATLAB version also supports path templates via `cfg.paths.*` and `resolve_path()`.
+
+## Stitching Backends (v2.1+)
+
+The stitching algorithm is now configurable:
+
+```yaml
+stitching:
+  backend: "native"     # or "unitmatch"
+  top_k: 3
+```
+
+- **native**: mind_snag's dual-evidence (FR + WF correlation) approach
+- **unitmatch**: UnitMatchPy waveform-only Bayesian matching
+
+Both backends return enriched `StitchResult` with per-match correlation scores, confidence values, and top-K candidates.
+
+```python
+result = stitcher.run()
+print(result.fr_score_matrix)    # [N x num_recs] FR correlations
+print(result.wf_score_matrix)    # [N x num_recs] WF correlations
+print(result.confidence_matrix)  # [N x num_recs] sqrt(fr * wf)
+```
+
+## Optional Dependencies (v2.1+)
+
+```bash
+pip install mind-snag                          # core only
+pip install mind-snag[spikeinterface]          # + SpikeInterface I/O and quality metrics
+pip install mind-snag[unitmatch]               # + UnitMatch comparison backend
+pip install mind-snag[all]                     # everything
+```
+
 ## Stage 5 (Auto-Curation)
 
 Same as MATLAB v1.0: auto-curation is not yet implemented programmatically.

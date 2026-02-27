@@ -16,7 +16,7 @@ from mind_snag.config import MindSnagConfig
 from mind_snag.io.ks_loader import load_ks_dir
 from mind_snag.io.mat_reader import load_mat
 from mind_snag.types import StitchResult
-from mind_snag.utils.paths import ks_output_dir, group_flag_str
+from mind_snag.utils.paths import ks_output_dir, npclu_filename, group_flag_str
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,31 @@ def _save_hdf5(path: Path, result: StitchResult) -> None:
         for i, rec in enumerate(result.recs):
             f.attrs[f"rec_{i}"] = rec
 
+        # Enriched score matrices
+        if result.fr_score_matrix is not None:
+            f.create_dataset("fr_scores", data=result.fr_score_matrix, compression="gzip")
+        if result.wf_score_matrix is not None:
+            f.create_dataset("wf_scores", data=result.wf_score_matrix, compression="gzip")
+        if result.confidence_matrix is not None:
+            f.create_dataset("confidence", data=result.confidence_matrix, compression="gzip")
+
+        # Top-K matches
+        if result.top_k_matches is not None:
+            topk_grp = f.create_group("top_k_matches")
+            for i, row_topk in enumerate(result.top_k_matches):
+                neuron_grp = topk_grp.create_group(f"neuron_{i:04d}")
+                for j, candidates in enumerate(row_topk):
+                    if candidates:
+                        rec_grp = neuron_grp.create_group(f"rec_{j}")
+                        clus = [c.matched_clu for c in candidates]
+                        fr_corrs = [c.fr_corr for c in candidates]
+                        wf_corrs = [c.wf_corr for c in candidates]
+                        confs = [c.confidence for c in candidates]
+                        rec_grp.create_dataset("cluster_ids", data=np.array(clus))
+                        rec_grp.create_dataset("fr_corrs", data=np.array(fr_corrs))
+                        rec_grp.create_dataset("wf_corrs", data=np.array(wf_corrs))
+                        rec_grp.create_dataset("confidence", data=np.array(confs))
+
     logger.info("Saved HDF5 stitch results: %s", path)
 
 
@@ -81,7 +106,8 @@ def _save_legacy(path: Path, cfg: MindSnagConfig, result: StitchResult) -> None:
     gflag = "Grouped" if cfg.ks_version == 4 else "NotGrouped"
 
     # Load channel map
-    ks_dir = ks_output_dir(data_root, day, tower, np_num, rec_str, cfg.ks_version)
+    ks_dir = ks_output_dir(data_root, day, tower, np_num, rec_str, cfg.ks_version,
+                           path_cfg=cfg.paths)
     sp = load_ks_dir(ks_dir, exclude_noise=False)
     chan_map = sp.chan_map  # 0-indexed
 
@@ -124,7 +150,7 @@ def _get_cluster_channel(
 ) -> int:
     """Look up the channel for a cluster from NPclu data."""
     for ext in (".h5", ".mat"):
-        npclu_path = data_root / day / rec / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu{ext}"
+        npclu_path = npclu_filename(data_root, day, rec, tower, np_num, gflag, ext=ext)
         if npclu_path.exists():
             if ext == ".h5":
                 with h5py.File(npclu_path, "r") as f:

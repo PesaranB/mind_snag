@@ -55,8 +55,14 @@ def extract_isolated_units(
         rec = recs[i_r]
 
         # Load NPclu
-        npclu_h5 = data_root / day / rec / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu.h5"
-        npclu_mat = data_root / day / rec / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu.mat"
+        npclu_h5 = npclu_filename(
+            data_root, day, rec, tower, np_num, gflag,
+            ext=".h5", path_cfg=cfg.paths,
+        )
+        npclu_mat = npclu_filename(
+            data_root, day, rec, tower, np_num, gflag,
+            ext=".mat", path_cfg=cfg.paths,
+        )
 
         if npclu_h5.exists():
             npclu_data = _load_npclu_h5(npclu_h5)
@@ -79,6 +85,7 @@ def extract_isolated_units(
                 grouped_rec_name=grouped_rec_name,
                 ks_version=cfg.ks_version,
                 ext=".h5",
+                path_cfg=cfg.paths,
             )
             # Also try .mat
             sort_file_mat = sort_file.with_suffix(".mat")
@@ -114,7 +121,10 @@ def extract_isolated_units(
         ).reshape(-1, 2) if iso_clu_ids else np.empty((0, 2), dtype=np.int64)
 
         # Save updated NPclu
-        out_path = data_root / day / rec / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu.h5"
+        out_path = npclu_filename(
+            data_root, day, rec, tower, np_num, gflag,
+            ext=".h5", path_cfg=cfg.paths,
+        )
         _update_npclu_with_iso(out_path, npclu_data, iso_spike_times, iso_cluster_ids, iso_clu_info)
 
         logger.info("Saved %d isolated units for rec %s", len(iso_clu_ids), rec)

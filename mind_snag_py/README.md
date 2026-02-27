@@ -9,7 +9,10 @@ Neuropixel spike sorting, curation, and cross-recording neuron stitching. Python
 ## Installation
 
 ```bash
-pip install mind-snag
+pip install mind-snag                          # core only
+pip install mind-snag[spikeinterface]          # + SpikeInterface I/O and quality metrics
+pip install mind-snag[unitmatch]               # + UnitMatch stitching comparison
+pip install mind-snag[all]                     # everything
 ```
 
 Or from source:

@@ -17,12 +17,12 @@ from numpy.typing import NDArray
 from mind_snag.config import MindSnagConfig
 from mind_snag.io.ks_loader import load_ks_dir
 from mind_snag.io.mat_reader import load_mat
-from mind_snag.types import StitchResult
+from mind_snag.types import MatchDetail, StitchResult
 from mind_snag.utils.channel_info import get_np_chan_depth_info
 from mind_snag.utils.psth import psth
 from mind_snag.utils.sorting_utils import sort_spikes_by_rt
 from mind_snag.utils.paths import (
-    ks_output_dir, rec_name_str, group_flag_str,
+    ks_output_dir, npclu_filename, rec_name_str, group_flag_str,
     sort_data_filename, raster_data_filename,
 )
 
@@ -65,10 +65,12 @@ class NeuronStitcher:
         self.cluster_type = cluster_type
 
         self.data_root = cfg.data_root
+        self.path_cfg = cfg.paths
         self.fr_threshold = cfg.stitching.fr_corr_threshold
         self.wf_threshold = cfg.stitching.wf_corr_threshold
         self.min_recs = cfg.stitching.min_recordings
         self.chan_range = cfg.stitching.channel_range
+        self.top_k = cfg.stitching.top_k
 
         self.gflag = group_flag_str(grouped)
         self.rec_str = rec_name_str(recs, grouped)
@@ -84,11 +86,23 @@ class NeuronStitcher:
 
         Returns
         -------
-        StitchResult with stitch_table [N x num_recs]
+        StitchResult with stitch_table [N x num_recs] and enriched score matrices
         """
         self.cfg.validate()
         self._load_cluster_info()
-        stitch_table = self._run_stitching()
+        stitch_table, match_details, top_k_matches = self._run_stitching()
+
+        n_neurons = stitch_table.shape[0]
+        fr_scores = np.full((n_neurons, self.num_recs), np.nan)
+        wf_scores = np.full((n_neurons, self.num_recs), np.nan)
+        confidence = np.full((n_neurons, self.num_recs), np.nan)
+
+        for i, row_details in enumerate(match_details):
+            for j, detail in enumerate(row_details):
+                if detail is not None:
+                    fr_scores[i, j] = detail.fr_corr
+                    wf_scores[i, j] = detail.wf_corr
+                    confidence[i, j] = detail.confidence
 
         return StitchResult(
             stitch_table=stitch_table,
@@ -96,6 +110,11 @@ class NeuronStitcher:
             day=self.day,
             tower=self.tower,
             np_num=self.np_num,
+            match_details=match_details,
+            top_k_matches=top_k_matches,
+            fr_score_matrix=fr_scores,
+            wf_score_matrix=wf_scores,
+            confidence_matrix=confidence,
         )
 
     def _load_cluster_info(self) -> None:
@@ -105,9 +124,9 @@ class NeuronStitcher:
         all_iso_chans: list[NDArray] = []
 
         for i_r, rec in enumerate(self.recs):
-            np_file = (
-                self.data_root / self.day / rec /
-                f"rec{rec}.{self.tower}.{self.np_num}.{self.gflag}.NPclu.mat"
+            np_file = npclu_filename(
+                self.data_root, self.day, rec, self.tower, self.np_num,
+                self.gflag, ext=".mat", path_cfg=self.path_cfg,
             )
             # Try HDF5 first
             np_h5 = np_file.with_suffix(".h5")
@@ -150,6 +169,7 @@ class NeuronStitcher:
                 ks_dir = ks_output_dir(
                     self.data_root, self.day, self.tower, self.np_num,
                     self.rec_str, self.cfg.ks_version,
+                    path_cfg=self.path_cfg,
                 )
                 self.sp = load_ks_dir(ks_dir, exclude_noise=False)
                 self.chan_map = self.sp.chan_map  # 0-indexed
@@ -200,6 +220,7 @@ class NeuronStitcher:
             int(clu), self.gflag,
             grouped_rec_name=self.rec_str if self.grouped else None,
             ks_version=self.cfg.ks_version,
+            path_cfg=self.path_cfg,
         )
         # Try .mat and .h5
         for ext in (".mat", ".h5"):
@@ -226,6 +247,7 @@ class NeuronStitcher:
             int(clu), self.gflag,
             grouped_rec_name=self.rec_str if self.grouped else None,
             ks_version=self.cfg.ks_version,
+            path_cfg=self.path_cfg,
         )
         for ext in (".mat", ".h5"):
             f = raster_file.with_suffix(ext)
@@ -253,10 +275,17 @@ class NeuronStitcher:
 
         return np.full(self.bn[1] - self.bn[0] + 1, np.nan)
 
-    def _run_stitching(self) -> NDArray:
-        """Execute the main stitching prediction loop."""
+    def _run_stitching(self) -> tuple[NDArray, list, list]:
+        """Execute the main stitching prediction loop.
+
+        Returns
+        -------
+        stitch_table, match_details, top_k_matches
+        """
         logger.info("Running stitching prediction...")
         prediction_list: list[NDArray] = []
+        details_list: list[list[MatchDetail | None]] = []
+        topk_list: list[list[list[MatchDetail]]] = []
 
         for current_chan in self.uni_chans:
             nearby_chans = self._get_within_range_channels(int(current_chan))
@@ -265,6 +294,7 @@ class NeuronStitcher:
             all_cluster_ids: list[NDArray] = [np.array([], dtype=np.int64) for _ in range(self.num_recs)]
             all_wfs: list[list[NDArray]] = [[] for _ in range(self.num_recs)]
             all_rates: list[list[NDArray]] = [[] for _ in range(self.num_recs)]
+            all_chan_indices: list[list[int]] = [[] for _ in range(self.num_recs)]
 
             for ch in nearby_chans:
                 ch_int = int(ch)
@@ -278,6 +308,7 @@ class NeuronStitcher:
                         all_cluster_ids[i_rec] = np.append(all_cluster_ids[i_rec], c)
                         all_wfs[i_rec].append(self._get_waveform(int(c), self.recs[i_rec]))
                         all_rates[i_rec].append(self._get_firing_rate(int(c), self.recs[i_rec]))
+                        all_chan_indices[i_rec].append(ch_int)
 
             # Compare each cluster on current channel against other recordings
             current_clu_ids = self._get_cluster_ids(int(current_chan))
@@ -290,7 +321,15 @@ class NeuronStitcher:
                     stitched = np.full(self.num_recs, np.nan)
                     stitched[i_rec] = clu_id
 
+                    row_details: list[MatchDetail | None] = [None] * self.num_recs
+                    row_details[i_rec] = MatchDetail(
+                        matched_clu=int(clu_id), fr_corr=1.0, wf_corr=1.0,
+                        spatial_distance=0.0, confidence=1.0,
+                    )
+                    row_topk: list[list[MatchDetail]] = [[] for _ in range(self.num_recs)]
+
                     other_recs = [r for r in range(self.num_recs) if r != i_rec]
+                    source_chan_idx = int(current_chan)
 
                     for other_rec in other_recs:
                         other_ids = all_cluster_ids[other_rec]
@@ -299,8 +338,9 @@ class NeuronStitcher:
 
                         other_wfs = all_wfs[other_rec]
                         other_rates = all_rates[other_rec]
+                        other_ch_indices = all_chan_indices[other_rec]
 
-                        # Compute FR correlations
+                        # Compute correlations
                         fr_corrs = np.array([
                             _pairwise_corr(fr, r) for r in other_rates
                         ])
@@ -308,34 +348,65 @@ class NeuronStitcher:
                             _pairwise_corr(wf, w) for w in other_wfs
                         ])
 
-                        fr_corrs = np.nan_to_num(fr_corrs, nan=-np.inf)
-                        best_idx = np.argmax(fr_corrs)
+                        fr_corrs_clean = np.nan_to_num(fr_corrs, nan=-np.inf)
+                        sorted_indices = np.argsort(-fr_corrs_clean)
 
-                        if fr_corrs[best_idx] >= self.fr_threshold and wf_corrs[best_idx] >= self.wf_threshold:
+                        # Build top-K candidates
+                        for ki in range(min(self.top_k, len(sorted_indices))):
+                            idx = sorted_indices[ki]
+                            fc = float(fr_corrs[idx]) if not np.isnan(fr_corrs[idx]) else 0.0
+                            wc = float(wf_corrs[idx]) if not np.isnan(wf_corrs[idx]) else 0.0
+                            sdist = float(abs(source_chan_idx - other_ch_indices[idx]))
+                            conf = float(np.sqrt(max(fc, 0.0) * max(wc, 0.0)))
+                            row_topk[other_rec].append(MatchDetail(
+                                matched_clu=int(other_ids[idx]),
+                                fr_corr=fc, wf_corr=wc,
+                                spatial_distance=sdist, confidence=conf,
+                            ))
+
+                        best_idx = sorted_indices[0]
+                        if fr_corrs_clean[best_idx] >= self.fr_threshold and wf_corrs[best_idx] >= self.wf_threshold:
                             stitched[other_rec] = other_ids[best_idx]
+                            fc = float(fr_corrs[best_idx])
+                            wc = float(wf_corrs[best_idx])
+                            sdist = float(abs(source_chan_idx - other_ch_indices[best_idx]))
+                            conf = float(np.sqrt(max(fc, 0.0) * max(wc, 0.0)))
+                            row_details[other_rec] = MatchDetail(
+                                matched_clu=int(other_ids[best_idx]),
+                                fr_corr=fc, wf_corr=wc,
+                                spatial_distance=sdist, confidence=conf,
+                            )
 
                     prediction_list.append(stitched)
+                    details_list.append(row_details)
+                    topk_list.append(row_topk)
 
         if not prediction_list:
             logger.info("No stitched neurons found.")
-            return np.empty((0, self.num_recs))
+            return np.empty((0, self.num_recs)), [], []
 
         # Deduplicate
         stitch_array = np.vstack(prediction_list)
         dedup = stitch_array.copy()
         dedup[np.isnan(dedup)] = 0
         _, unique_idx = np.unique(dedup, axis=0, return_index=True)
-        unique_stitch = stitch_array[np.sort(unique_idx)]
+        sorted_unique_idx = np.sort(unique_idx)
+        unique_stitch = stitch_array[sorted_unique_idx]
+        unique_details = [details_list[i] for i in sorted_unique_idx]
+        unique_topk = [topk_list[i] for i in sorted_unique_idx]
 
         # Filter by minimum recording count
         valid_counts = np.sum(~np.isnan(unique_stitch), axis=1)
-        stitch_table = unique_stitch[valid_counts >= self.min_recs]
+        keep_mask = valid_counts >= self.min_recs
+        stitch_table = unique_stitch[keep_mask]
+        final_details = [unique_details[i] for i, k in enumerate(keep_mask) if k]
+        final_topk = [unique_topk[i] for i, k in enumerate(keep_mask) if k]
 
         logger.info(
             "Stitching complete: %d neurons found across %d recordings.",
             stitch_table.shape[0], self.num_recs,
         )
-        return stitch_table
+        return stitch_table, final_details, final_topk
 
 
 def _pairwise_corr(a: NDArray, b: NDArray) -> float:

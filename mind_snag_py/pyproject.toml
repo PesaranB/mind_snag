@@ -33,6 +33,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+spikeinterface = [
+    "spikeinterface[full]>=0.101",
+]
+unitmatch = [
+    "UnitMatchPy>=0.1",
+]
+all = [
+    "mind-snag[spikeinterface,unitmatch]",
+]
 dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",

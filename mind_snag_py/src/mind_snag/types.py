@@ -87,6 +87,17 @@ class RasterDataEntry:
 
 
 @dataclass
+class MatchDetail:
+    """Per-neuron-per-recording match details."""
+
+    matched_clu: int
+    fr_corr: float
+    wf_corr: float
+    spatial_distance: float
+    confidence: float
+
+
+@dataclass
 class StitchResult:
     """Result of cross-recording neuron stitching.
 
@@ -95,7 +106,13 @@ class StitchResult:
     """
 
     stitch_table: NDArray[np.float64]
+    sessions: list[dict] = field(default_factory=list)
     recs: list[str] = field(default_factory=list)
     day: str = ""
     tower: str = ""
     np_num: int = 1
+    match_details: list[list[MatchDetail | None]] | None = None
+    top_k_matches: list[list[list[MatchDetail]]] | None = None
+    fr_score_matrix: NDArray[np.float64] | None = None
+    wf_score_matrix: NDArray[np.float64] | None = None
+    confidence_matrix: NDArray[np.float64] | None = None

@@ -19,7 +19,8 @@ from mind_snag.io.mat_reader import load_mat
 from mind_snag.io.hdf5_writer import write_sort_data_h5
 from mind_snag.utils.channel_info import clus_channel_info
 from mind_snag.utils.paths import (
-    ks_output_dir, rec_name_str, group_flag_str, sort_data_filename,
+    ks_output_dir, npclu_filename, rec_name_str, group_flag_str,
+    sort_data_filename,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,7 +53,8 @@ def compute_isolation(
 
     rec_str = rec_name_str(recs, grouped)
     gflag = group_flag_str(grouped)
-    ks_dir = ks_output_dir(data_root, day, tower, np_num, rec_str, cfg.ks_version)
+    ks_dir = ks_output_dir(data_root, day, tower, np_num, rec_str, cfg.ks_version,
+                           path_cfg=cfg.paths)
 
     sp = load_ks_dir(ks_dir, exclude_noise=False)
     max_site, min_site = clus_channel_info(cfg, day, recs, tower, np_num, grouped)
@@ -69,7 +71,10 @@ def compute_isolation(
         rec = recs[i_r]
 
         if grouped:
-            npclu_path = data_root / day / rec / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu.h5"
+            npclu_path = npclu_filename(
+                data_root, day, rec, tower, np_num, gflag,
+                ext=".h5", path_cfg=cfg.paths,
+            )
             # Try HDF5 first, fall back to .mat
             if npclu_path.exists():
                 import h5py
@@ -79,7 +84,10 @@ def compute_isolation(
                     temp_scaling = np.array(f["temp_scaling_amps"])
                     pc_feat = np.array(f["pc_feat"]) if "pc_feat" in f else None
             else:
-                npclu_path_mat = data_root / day / rec / f"rec{rec}.{tower}.{np_num}.{gflag}.NPclu.mat"
+                npclu_path_mat = npclu_filename(
+                    data_root, day, rec, tower, np_num, gflag,
+                    ext=".mat", path_cfg=cfg.paths,
+                )
                 npclu_data = load_mat(npclu_path_mat)
                 npclu = npclu_data.get("NPclu", np.array([]))
                 rec_spike_temps = npclu[:, 1] if len(npclu) > 0 else np.array([])
@@ -219,6 +227,7 @@ def compute_isolation(
                 grouped_rec_name=grouped_rec_name,
                 ks_version=cfg.ks_version,
                 ext=".h5",
+                path_cfg=cfg.paths,
             )
             out_file.parent.mkdir(parents=True, exist_ok=True)
             write_sort_data_h5(out_file, frames)
